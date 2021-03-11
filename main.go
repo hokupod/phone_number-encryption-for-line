@@ -7,12 +7,23 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/moxtsuan/go-nkf"
 	"golang.org/x/sync/errgroup"
 )
+
+var isNumberOnly = func() func(string) bool {
+	re := regexp.MustCompile("^[0-9]+$")
+
+	return func(str string) bool {
+		re := re.Copy()
+		return re.MatchString(str)
+	}
+}()
 
 func main() {
 	flag.Parse()
@@ -64,6 +75,7 @@ func toHash(str string) string {
 	return fmt.Sprintf("%x", sha256.Sum256(b))
 }
 func formatPhoneNumber(str string) string {
+	str = strings.Replace(str, "-", "", -1)
 	if strings.HasPrefix(str, "+81") {
 		str = str[3:]
 	}
@@ -73,10 +85,12 @@ func formatPhoneNumber(str string) string {
 	return str
 }
 func isMobileNumber(str string) bool {
-	return strings.HasPrefix(str, "050") ||
-		strings.HasPrefix(str, "070") ||
-		strings.HasPrefix(str, "080") ||
-		strings.HasPrefix(str, "090")
+	isMobileNumberLength := utf8.RuneCountInString(str) == 11
+	return isNumberOnly(str) && isMobileNumberLength &&
+		(strings.HasPrefix(str, "050") ||
+			strings.HasPrefix(str, "070") ||
+			strings.HasPrefix(str, "080") ||
+			strings.HasPrefix(str, "090"))
 }
 func createCsvReader(file *os.File) (*csv.Reader, error) {
 	csvString, err := nkf.Convert(file, "", "UTF8", "")
